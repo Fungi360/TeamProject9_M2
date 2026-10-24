@@ -6,14 +6,49 @@ import os
 import sys
 from pathlib import Path
 
-from agents import Agent, Runner, set_default_openai_api, set_default_openai_client
+from agents import (
+    Agent,
+    Runner,
+    set_default_openai_api,
+    set_default_openai_client,
+    set_trace_processors,
+)
 from agents.mcp import MCPServerStdio, MCPServerStdioParams
+from agents.tracing import TracingProcessor
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 
 PROJECT_FOLDER = Path(__file__).resolve().parent
 load_dotenv(PROJECT_FOLDER / ".env")
+
+
+class ConsoleTracingProcessor(TracingProcessor):
+    """Print trace and span utilization without exporting to OpenAI."""
+
+    def on_trace_start(self, trace):
+        print(f"\n[trace] '{trace.name}' started")
+
+    def on_trace_end(self, trace):
+        print(f"[trace] '{trace.name}' finished")
+
+    def on_span_start(self, span):
+        pass
+
+    def on_span_end(self, span):
+        data = span.span_data.export()
+        summary = f"  [span] {data.get('type', 'unknown')}"
+        if data.get("name"):
+            summary += f" - {data['name']}"
+        if data.get("usage"):
+            summary += f" | usage={data['usage']}"
+        print(summary)
+
+    def shutdown(self):
+        pass
+
+    def force_flush(self):
+        pass
 
 
 def configure_model_client() -> None:
@@ -25,6 +60,7 @@ def configure_model_client() -> None:
     client = AsyncOpenAI(base_url=base_url, api_key=api_key)
     set_default_openai_client(client, use_for_tracing=False)
     set_default_openai_api("chat_completions")
+    set_trace_processors([ConsoleTracingProcessor()])
 
 
 async def ask_agent(question: str) -> str:
@@ -39,19 +75,37 @@ async def ask_agent(question: str) -> str:
         ),
         client_session_timeout_seconds=90,
     ) as server:
-        agent = Agent(
-            name="Commercial Vendor Catalog Advisor",
+        reviewer = Agent(
+            name="Procurement Reviewer",
             instructions=(
-                "You help small commercial buyers compare vendor catalogs. "
-                "For every product comparison, call compare_vendor_catalogs before answering. "
-                "Use only the returned catalog data. Clearly separate lowest price from highest "
-                "quality, mention material differences, and state when no catalog is available."
+                "You are the second-stage procurement reviewer. Review the Catalog Analyst's "
+                "evidence and preserve its factual recommendations. Correct unsupported claims, "
+                "state separate lowest-price and highest-quality conclusions, explain material "
+                "trade-offs, and do not place an order or invent vendor data."
             ),
             mcp_servers=[server],
             model="gpt-oss",
         )
-        result = await Runner.run(agent, question)
-        return result.final_output
+        analyst = Agent(
+            name="Catalog Analyst",
+            instructions=(
+                "You are the first-stage Catalog Analyst. For every product comparison, call "
+                "sequential_reason, compare_vendor_catalogs, and retrieve_procurement_guidance. "
+                "Present only evidence returned by those tools, including each vendor, price, "
+                "pack size, material, and quality score. Hand off to Procurement Reviewer "
+                "after producing the evidence summary."
+            ),
+            mcp_servers=[server],
+            model="gpt-oss",
+        )
+        evidence = await Runner.run(analyst, question, max_turns=25)
+        review_request = (
+            f"Original buyer question: {question}\n\n"
+            f"Catalog Analyst evidence to review:\n{evidence.final_output}\n\n"
+            "Perform the final procurement review."
+        )
+        final_review = await Runner.run(reviewer, review_request, max_turns=25)
+        return final_review.final_output
 
 
 async def main() -> None:

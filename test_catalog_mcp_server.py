@@ -2,7 +2,11 @@
 
 import json
 
-from catalog_mcp_server import compare_vendor_catalogs
+from catalog_mcp_server import (
+    compare_vendor_catalogs,
+    retrieve_procurement_guidance,
+    sequential_reason,
+)
 
 
 def test_holiday_lights_recommendation() -> None:
@@ -21,3 +25,26 @@ def test_unknown_category_lists_available_inputs() -> None:
     result = json.loads(compare_vendor_catalogs("office chairs"))
     assert result["error"] == "No catalog found for 'office chairs'."
     assert "holiday string lights" in result["available_categories"]
+
+
+def test_procurement_guidance_retrieval() -> None:
+    result = json.loads(retrieve_procurement_guidance("holiday string lights"))
+    assert result["product_category"] == "holiday string lights"
+    assert any("weather-resistant PVC" in item for item in result["guidance"])
+
+
+def test_sequential_reasoning_pattern() -> None:
+    result = json.loads(
+        sequential_reason("holiday string lights", "Three vendor records returned")
+    )
+    assert [step["step"] for step in result["steps"]] == [
+        "Observe",
+        "Retrieve",
+        "Compare",
+        "Decide",
+    ]
+
+
+def test_unknown_category_has_no_guidance() -> None:
+    result = json.loads(retrieve_procurement_guidance("office chairs"))
+    assert result["error"] == "No procurement guidance found for 'office chairs'."
