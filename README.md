@@ -64,7 +64,15 @@ python -m pip install -r requirements.txt
 python vendor_catalog_agent.py "Compare holiday string lights across the vendors."
 ```
 
-6. Run tests without an API key:
+6. Optionally run the dependency-free browser front end:
+
+```bash
+python app.py
+```
+
+Open `http://127.0.0.1:5000` and enter a catalog comparison question. `app.py` uses Python's standard library and calls the existing `ask_agent` function; it does not modify the MCP server or agent backend. Stop the server with `Ctrl+C`.
+
+7. Run tests without an API key:
 
 ```bash
 python -m pytest -q
@@ -101,6 +109,7 @@ python -m pytest -q
 
 ## Files
 
+- `app.py`: Optional dependency-free browser front end that calls the existing agent.
 - `catalog_mcp_server.py`: FastMCP server with catalog, knowledge-retrieval, and sequential-reasoning tools.
 - `vendor_catalog_agent.py`: two-agent orchestration and explicit analyst-to-reviewer handoff.
 - `test_catalog_mcp_server.py`: M2 catalog acceptance tests and M3 MCP capability tests.
