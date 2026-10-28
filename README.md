@@ -31,7 +31,7 @@ The `sequential_reason` tool implements a sequential-thinking reasoning pattern.
 - Added an explicit, deterministic handoff passing the original question and analyst evidence to the reviewer.
 - Added `sequential_reason`, an MCP sequential-thinking tool that produces an auditable `Observe -> Retrieve -> Compare -> Decide` trace.
 - Added `retrieve_procurement_guidance`, a knowledge/retrieval MCP tool for category-specific procurement guidance.
-- Expanded tests from three to six cases, covering catalog recommendations, retrieval, sequential reasoning, and unknown categories.
+- Expanded the suite from six to twelve test cases, covering each catalog category, recommendation outputs, input normalization, knowledge retrieval, and sequential reasoning.
 - Updated setup and architecture documentation to reflect M3 behavior.
 
 ### M2 baseline retained
@@ -86,6 +86,12 @@ python -m pytest -q
 4. Holiday-light guidance retrieval -> category-specific indoor/outdoor PVC guidance.
 5. Sequential reasoning -> stages `Observe`, `Retrieve`, `Compare`, `Decide`.
 6. Unknown-category guidance -> explicit missing-guidance error.
+7. `brake pads` -> best value `Garage Wholesale`; highest quality `AutoParts Hub`.
+8. Brake-pad records -> both vendor records include the expected axle-set pack size.
+9. Catalog category with extra spaces and uppercase letters -> normalized category and correct recommendation.
+10. Restaurant glove guidance -> includes latex-free material guidance.
+11. Guidance category with extra spaces and uppercase letters -> normalized category and both guidance entries.
+12. Sequential reasoning with padded inputs -> normalized category and trimmed observation.
 
 ## Current capabilities
 

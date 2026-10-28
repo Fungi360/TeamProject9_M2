@@ -48,3 +48,42 @@ def test_sequential_reasoning_pattern() -> None:
 def test_unknown_category_has_no_guidance() -> None:
     result = json.loads(retrieve_procurement_guidance("office chairs"))
     assert result["error"] == "No procurement guidance found for 'office chairs'."
+
+
+def test_brake_pads_recommendation() -> None:
+    result = json.loads(compare_vendor_catalogs("brake pads"))
+    assert result["recommendation"]["best_value_vendor"] == "Garage Wholesale"
+    assert result["recommendation"]["highest_quality_vendor"] == "AutoParts Hub"
+
+
+def test_brake_pads_return_both_vendor_records() -> None:
+    result = json.loads(compare_vendor_catalogs("brake pads"))
+    assert [vendor["vendor"] for vendor in result["vendors"]] == [
+        "AutoParts Hub",
+        "Garage Wholesale",
+    ]
+    assert all(vendor["pack_size"] == "1 axle set" for vendor in result["vendors"])
+
+
+def test_catalog_category_is_case_and_whitespace_insensitive() -> None:
+    result = json.loads(compare_vendor_catalogs("  BRAKE PADS  "))
+    assert result["product_category"] == "brake pads"
+    assert result["recommendation"]["best_value_vendor"] == "Garage Wholesale"
+
+
+def test_glove_guidance_mentions_latex_free_material() -> None:
+    result = json.loads(retrieve_procurement_guidance("restaurant nitrile gloves"))
+    assert result["product_category"] == "restaurant nitrile gloves"
+    assert any("latex-free" in item for item in result["guidance"])
+
+
+def test_guidance_category_is_case_and_whitespace_insensitive() -> None:
+    result = json.loads(retrieve_procurement_guidance("  RESTAURANT NITRILE GLOVES  "))
+    assert result["product_category"] == "restaurant nitrile gloves"
+    assert len(result["guidance"]) == 2
+
+
+def test_sequential_reasoning_normalizes_category_and_observation() -> None:
+    result = json.loads(sequential_reason("  BRAKE PADS ", "  Compare materials.  "))
+    assert result["product_category"] == "brake pads"
+    assert result["steps"][0]["result"] == "Compare materials."
