@@ -38,6 +38,8 @@ Procurement guidance lives in Markdown files under `knowledge/` (one per categor
 
 ### M3 changes, round 2 (structured handoff, RAG, guardrails, evaluation)
 
+- **Ran the system live on NRP** and recorded the measured cost and latency under Known limitations. Updated eval case E04 to accept the reviewer's live behavior (it names the cheapest outdoor-rated vendor, SunCo Supply, as well as the highest-quality one).
+
 - **Replaced the hard-coded guidance dictionary with a retrieval layer** (`knowledge_base.py`, `knowledge/*.md`). Why: the dictionary always returned the same two lines regardless of the question; retrieval now returns the guidance that matches what the buyer asked (for example, a towing question surfaces the semi-metallic heat guidance first).
 - **Made the handoff payload explicit JSON** built from the analyst's actual tool results, not its free-text summary. Why: the reviewer can now check claims against raw evidence instead of trusting the analyst's paraphrase.
 - **Added a handoff trigger** (`handoff_ready`). Why: in M2 an unknown category still reached the second stage, which wasted a model call and risked an invented answer.
@@ -156,7 +158,9 @@ The 10 end-to-end evaluation cases for M4 are in `eval/m3_eval_cases.json`.
 - Retrieval uses TF-IDF vectors, so it matches words, not meaning; a question with no shared words ranks chunks almost evenly. The knowledge base is 15 hand-written chunks.
 - Guardrails are pattern-based and can miss reworded order requests or flag a vendor name used in a different sense.
 - The output guardrail checks vendor names, not prices, so a wrong price for a correct vendor would pass.
-- Each question makes at least two model runs (more if the guardrail retries), so latency is roughly double M2.
+- **Latency (measured on NRP, Oct 28):** a full question took about 2.5 minutes. The analyst's 4 tool-calling turns took about 41 seconds; the reviewer took about 113 seconds because it wrote a long 1,682-token answer. Capping the reviewer's answer length is the first fix for M4.
+- **Cost (measured):** about 4,900 input and 2,300 output tokens per question across 5 model calls, roughly $0.0015 at hosted gpt-oss-120b prices.
+- An unknown category still costs 4 analyst model calls (about 35 seconds) before the handoff trigger stops the run; checking the category before any model call would remove that.
 - Quality scores are fixed sample values rather than derived from live reviews or specifications.
 - `best value` is lowest unit price only; it does not yet weight pack count, quality, freight, or total project cost.
 - The agent does not upload, parse, or persist PDFs, spreadsheets, or CSV catalogs.
