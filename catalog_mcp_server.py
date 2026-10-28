@@ -5,23 +5,29 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from knowledge_base import KNOWLEDGE_BASE
+
 
 mcp = FastMCP("Vendor Catalog Comparison")
 
-PROCUREMENT_GUIDANCE: dict[str, list[str]] = {
-    "holiday string lights": [
-        "Indoor PVC is suitable for protected indoor displays, while weather-resistant PVC is better for outdoor exposure.",
-        "Compare total project cost by multiplying unit price by the required pack count.",
-    ],
-    "restaurant nitrile gloves": [
-        "For food-service gloves, confirm the material is latex-free and suitable for the intended handling task.",
-        "Compare cost per glove as well as pack price when pack sizes differ.",
-    ],
-    "brake pads": [
-        "Ceramic formulations generally prioritize quiet operation and lower dust; semi-metallic formulations prioritize heat tolerance and durability.",
-        "Confirm part fit and axle-set compatibility before recommending an order.",
-    ],
+CATEGORY_ALIASES: dict[str, str] = {
+    "holiday lights": "holiday string lights",
+    "christmas lights": "holiday string lights",
+    "string lights": "holiday string lights",
+    "led string lights": "holiday string lights",
+    "nitrile gloves": "restaurant nitrile gloves",
+    "gloves": "restaurant nitrile gloves",
+    "food service gloves": "restaurant nitrile gloves",
+    "brake pad": "brake pads",
+    "ceramic brake pads": "brake pads",
 }
+
+
+def normalize_category(product_category: str) -> str:
+    """Lowercase, collapse whitespace, and map known aliases to catalog keys."""
+    category = " ".join(product_category.lower().split())
+    return CATEGORY_ALIASES.get(category, category)
+
 
 CATALOGS: dict[str, list[dict[str, Any]]] = {
     "holiday string lights": [
@@ -92,7 +98,7 @@ CATALOGS: dict[str, list[dict[str, Any]]] = {
 @mcp.tool()
 def compare_vendor_catalogs(product_category: str) -> str:
     """Compare matching products across vendors on price, quality, and material."""
-    category = product_category.strip().lower()
+    category = normalize_category(product_category)
     products = CATALOGS.get(category)
     if not products:
         available = ", ".join(sorted(CATALOGS))
@@ -122,17 +128,24 @@ def compare_vendor_catalogs(product_category: str) -> str:
 
 
 @mcp.tool()
-def retrieve_procurement_guidance(product_category: str) -> str:
-    """Retrieve stored procurement guidance for a product category."""
-    category = product_category.strip().lower()
-    guidance = PROCUREMENT_GUIDANCE.get(category)
-    if not guidance:
+def retrieve_procurement_guidance(product_category: str, question: str = "") -> str:
+    """Retrieve the most relevant procurement guidance chunks (RAG) for a category and question."""
+    category = normalize_category(product_category)
+    if category not in KNOWLEDGE_BASE.categories():
         return json.dumps(
             {"error": f"No procurement guidance found for '{product_category}'."},
             indent=2,
         )
+    hits = KNOWLEDGE_BASE.search(f"{category} {question}", category=category, top_k=3)
     return json.dumps(
-        {"product_category": category, "guidance": guidance},
+        {
+            "product_category": category,
+            "guidance": [hit["text"] for hit in hits],
+            "sources": [
+                {"chunk_id": hit["chunk_id"], "heading": hit["heading"], "score": hit["score"]}
+                for hit in hits
+            ],
+        },
         indent=2,
     )
 
@@ -140,7 +153,7 @@ def retrieve_procurement_guidance(product_category: str) -> str:
 @mcp.tool()
 def sequential_reason(product_category: str, observation: str) -> str:
     """Create an auditable Observe, Retrieve, Compare, Decide reasoning trace."""
-    category = product_category.strip().lower()
+    category = normalize_category(product_category)
     return json.dumps(
         {
             "product_category": category,

@@ -80,7 +80,7 @@ def test_glove_guidance_mentions_latex_free_material() -> None:
 def test_guidance_category_is_case_and_whitespace_insensitive() -> None:
     result = json.loads(retrieve_procurement_guidance("  RESTAURANT NITRILE GLOVES  "))
     assert result["product_category"] == "restaurant nitrile gloves"
-    assert len(result["guidance"]) == 2
+    assert len(result["guidance"]) >= 2
 
 
 def test_sequential_reasoning_normalizes_category_and_observation() -> None:
